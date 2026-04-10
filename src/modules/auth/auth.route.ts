@@ -1,12 +1,13 @@
 import express from 'express';
 import passport from 'passport';
 import { AuthController } from './auth.controller';
+import { authLimiter } from '../../middlewares/rateLimit';
 import auth from '../../middlewares/auth';
 
 const router = express.Router();
 
-router.post('/register', AuthController.register);
-router.post('/login', AuthController.login);
+router.post('/register', authLimiter, AuthController.register);
+router.post('/login', authLimiter, AuthController.login);
 router.get('/me', auth(), AuthController.getMe);
 router.patch('/update-profile', auth(), AuthController.updateProfile);
 

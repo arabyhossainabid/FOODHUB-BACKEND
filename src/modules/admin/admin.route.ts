@@ -19,4 +19,14 @@ router.get('/stats', auth(Role.ADMIN), AdminController.getDashboardStats);
 router.get('/reviews', auth(Role.ADMIN), AdminController.getAllReviews);
 router.delete('/reviews/:id', auth(Role.ADMIN), AdminController.deleteReview);
 
+// Offer Management
+router.get('/offers', auth(Role.ADMIN), AdminController.getAllOffers);
+router.post('/offers', auth(Role.ADMIN), AdminController.createOffer);
+router.patch('/offers/:id', auth(Role.ADMIN), AdminController.updateOffer);
+router.delete('/offers/:id', auth(Role.ADMIN), AdminController.deleteOffer);
+
+// Home Content Management
+router.get('/home-content', auth(Role.ADMIN), AdminController.getHomeContent);
+router.put('/home-content', auth(Role.ADMIN), AdminController.upsertHomeContent);
+
 export const AdminRoutes = router;

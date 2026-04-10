@@ -1,4 +1,4 @@
-import { Role } from '@prisma/client';
+import { DiscountType, Role } from '@prisma/client';
 import prisma from '../../config/prisma';
 
 const getAllUsers = async () => {
@@ -104,11 +104,130 @@ const deleteReview = async (id: string) => {
   });
 };
 
+const getAllOffers = async () => {
+  return prisma.offer.findMany({
+    where: {
+      code: { not: null },
+    },
+    orderBy: { createdAt: 'desc' },
+  });
+};
+
+const createOffer = async (payload: {
+  title: string;
+  description: string;
+  image?: string;
+  tag: string;
+  color: string;
+  code: string;
+  discountType: DiscountType;
+  discountValue: number;
+  minOrderAmount?: number;
+  maxDiscountAmount?: number | null;
+  startsAt?: string | Date | null;
+  expiresAt?: string | Date | null;
+  usageLimit?: number | null;
+  isActive?: boolean;
+}) => {
+  const normalizedCode = payload.code.trim().toUpperCase();
+  if (!normalizedCode) {
+    throw { statusCode: 400, message: 'Offer code is required' };
+  }
+
+  return prisma.offer.create({
+    data: {
+      title: payload.title,
+      description: payload.description,
+      image: payload.image || '',
+      tag: payload.tag,
+      color: payload.color,
+      code: normalizedCode,
+      discountType: payload.discountType,
+      discountValue: payload.discountValue,
+      minOrderAmount: payload.minOrderAmount ?? 0,
+      maxDiscountAmount: payload.maxDiscountAmount ?? null,
+      startsAt: payload.startsAt ? new Date(payload.startsAt) : null,
+      expiresAt: payload.expiresAt ? new Date(payload.expiresAt) : null,
+      usageLimit: payload.usageLimit ?? null,
+      isActive: payload.isActive ?? true,
+    },
+  });
+};
+
+const updateOffer = async (
+  id: string,
+  payload: Partial<{
+    title: string;
+    description: string;
+        image: string;
+    tag: string;
+    color: string;
+    code: string;
+    discountType: DiscountType;
+    discountValue: number;
+    minOrderAmount: number;
+    maxDiscountAmount: number | null;
+    startsAt: string | Date | null;
+    expiresAt: string | Date | null;
+    usageLimit: number | null;
+    usedCount: number;
+    isActive: boolean;
+  }>,
+) => {
+  const data = { ...payload } as any;
+  if (typeof data.code === 'string') {
+    data.code = data.code.trim().toUpperCase();
+  }
+  if (data.startsAt) {
+    data.startsAt = new Date(data.startsAt);
+  }
+  if (data.expiresAt) {
+    data.expiresAt = new Date(data.expiresAt);
+  }
+
+  return prisma.offer.update({
+    where: { id },
+    data,
+  });
+};
+
+const deleteOffer = async (id: string) => {
+  await prisma.offer.delete({ where: { id } });
+};
+
+const getHomeContent = async () => {
+  return prisma.homeContent.findFirst({
+    where: { key: 'HOME_PAGE' },
+    orderBy: { updatedAt: 'desc' },
+  });
+};
+
+const upsertHomeContent = async (content: unknown, isActive = true) => {
+  return prisma.homeContent.upsert({
+    where: { key: 'HOME_PAGE' },
+    update: {
+      content: content as any,
+      isActive,
+    },
+    create: {
+      key: 'HOME_PAGE',
+      content: content as any,
+      isActive,
+    },
+  });
+};
+
 export const AdminService = {
   getAllUsers,
   updateUserStatus,
   getAllOrders,
   getDashboardStats,
   getAllReviews,
-  deleteReview
+  deleteReview,
+  getAllOffers,
+  createOffer,
+  updateOffer,
+  deleteOffer,
+  getHomeContent,
+  upsertHomeContent,
 };

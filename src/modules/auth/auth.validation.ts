@@ -4,7 +4,9 @@ export const registerSchema = z.object({
   name: z.string().min(1, 'Name is required'),
   email: z.string().email('Invalid email address'),
   password: z.string().min(6, 'Password must be at least 6 characters long'),
-  role: z.enum(['CUSTOMER', 'PROVIDER', 'ADMIN']).optional(),
+  role: z
+    .enum(['CUSTOMER', 'PROVIDER', 'ADMIN', 'MANAGER', 'ORGANIZER'])
+    .optional(),
   shopName: z.string().optional(),
   address: z.string().optional(),
 }).refine(data => {

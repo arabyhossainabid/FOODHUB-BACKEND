@@ -28,13 +28,18 @@ const getAllMeals = async (req: Request, res: Response, next: NextFunction) => {
       ];
     }
 
+    const dbSortBy = ['createdAt', 'price'].includes(String(sortBy))
+      ? String(sortBy)
+      : 'createdAt';
+    const dbOrder: 'asc' | 'desc' = String(order).toLowerCase() === 'asc' ? 'asc' : 'desc';
+
     const [total, meals] = await Promise.all([
       prisma.meal.count({ where }),
       prisma.meal.findMany({
         where,
         skip,
         take,
-        orderBy: { [sortBy as string]: order },
+        orderBy: { [dbSortBy]: dbOrder },
         include: {
           provider: {
             include: { user: { select: { name: true } } }
@@ -48,12 +53,15 @@ const getAllMeals = async (req: Request, res: Response, next: NextFunction) => {
     ]);
 
     // Calculate average rating for each meal
-    const mealsWithRating = meals.map(meal => ({
+    let mealsWithRating = meals.map(meal => ({
       ...meal,
       averageRating: meal.reviews.length > 0
         ? meal.reviews.reduce((sum, r) => sum + r.rating, 0) / meal.reviews.length
         : 0
     }));
+    if (String(sortBy) === 'rating') {
+      mealsWithRating = mealsWithRating.sort((a, b) => (b.averageRating || 0) - (a.averageRating || 0));
+    }
 
     res.status(200).json({
       success: true,

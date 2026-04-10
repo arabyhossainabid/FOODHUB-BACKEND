@@ -10,6 +10,9 @@ import { ReviewRoutes } from './modules/review/review.route';
 import { MetaRoutes } from './modules/meta/meta.route';
 import { PaymentRoutes } from './modules/payment/payment.route';
 import { UploadRoutes } from './modules/upload/upload.route';
+import { AiRoutes } from './modules/ai/ai.route';
+import { ManagerRoutes } from './modules/manager/manager.route';
+import { OrganizerRoutes } from './modules/organizer/organizer.route';
 
 const router = express.Router();
 
@@ -38,5 +41,8 @@ router.use('/uploads', UploadRoutes);
 router.use('/admin', AdminRoutes);
 router.use('/admin/categories', CategoryRoutes);
 router.use('/provider', ManagementProviderRoutes);
+router.use('/manager', ManagerRoutes);
+router.use('/organizer', OrganizerRoutes);
+router.use('/ai', AiRoutes);
 
 export default router;

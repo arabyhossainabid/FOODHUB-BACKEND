@@ -6,6 +6,41 @@ import { Role, Prisma } from '@prisma/client';
 import { createOrderSchema } from './order.validation';
 
 const router = express.Router();
+const isOfferCurrentlyValid = (offer: {
+  isActive: boolean;
+  startsAt: Date | null;
+  expiresAt: Date | null;
+  usageLimit: number | null;
+  usedCount: number;
+}) => {
+  const now = new Date();
+  if (!offer.isActive) return false;
+  if (offer.startsAt && offer.startsAt > now) return false;
+  if (offer.expiresAt && offer.expiresAt < now) return false;
+  if (offer.usageLimit !== null && offer.usedCount >= offer.usageLimit) return false;
+  return true;
+};
+
+const calculateOfferDiscount = (
+  offer: {
+    discountType: 'PERCENTAGE' | 'FIXED';
+    discountValue: number;
+    minOrderAmount: number;
+    maxDiscountAmount: number | null;
+  },
+  subtotal: number,
+) => {
+  if (subtotal < offer.minOrderAmount) return 0;
+  const rawDiscount =
+    offer.discountType === 'PERCENTAGE'
+      ? Math.round((subtotal * offer.discountValue) / 100)
+      : Math.round(offer.discountValue);
+  const cappedDiscount =
+    offer.maxDiscountAmount !== null
+      ? Math.min(rawDiscount, offer.maxDiscountAmount)
+      : rawDiscount;
+  return Math.max(0, Math.min(cappedDiscount, subtotal));
+};
 
 // Create Order (Customer)
 const createOrder = async (req: Request, res: Response, next: NextFunction) => {
@@ -16,7 +51,7 @@ const createOrder = async (req: Request, res: Response, next: NextFunction) => {
     }
 
     const validatedData = createOrderSchema.parse(req.body);
-    const { items, address } = validatedData;
+    const { items, address, offerCode } = validatedData;
 
     let totalAmount = 0;
     const orderItemsData: any[] = [];
@@ -43,8 +78,39 @@ const createOrder = async (req: Request, res: Response, next: NextFunction) => {
       });
     }
 
+    let appliedOffer: {
+      id: string;
+      code: string;
+      discountAmount: number;
+    } | null = null;
+
+    if (offerCode) {
+      const normalizedCode = offerCode.trim().toUpperCase();
+      const offer = await prisma.offer.findUnique({
+        where: { code: normalizedCode },
+      });
+
+      if (!offer || !offer.code || !isOfferCurrentlyValid(offer)) {
+        throw { statusCode: 400, message: 'Invalid or inactive offer code' };
+      }
+
+      const discountAmount = calculateOfferDiscount(offer, totalAmount);
+      if (discountAmount <= 0) {
+        throw { statusCode: 400, message: `Order must be at least ${offer.minOrderAmount} for this offer` };
+      }
+      totalAmount = totalAmount - discountAmount;
+      appliedOffer = { id: offer.id, code: offer.code, discountAmount };
+    }
+
     // Create Order with Transaction
     const result = await prisma.$transaction(async (tx) => {
+      if (appliedOffer) {
+        await tx.offer.update({
+          where: { id: appliedOffer.id },
+          data: { usedCount: { increment: 1 } },
+        });
+      }
+
       const order = await tx.order.create({
         data: {
           userId: (user as any).id,
@@ -64,7 +130,12 @@ const createOrder = async (req: Request, res: Response, next: NextFunction) => {
         }))
       });
 
-      return order;
+      return {
+        ...order,
+        appliedOffer: appliedOffer
+          ? { code: appliedOffer.code, discountAmount: appliedOffer.discountAmount }
+          : null,
+      };
     });
 
     res.status(201).json({
@@ -196,7 +267,10 @@ const getMyStats = async (req: Request, res: Response, next: NextFunction) => {
       throw { statusCode: 401, message: 'User not authenticated' };
     }
 
-    const [totalSpent, statusCounts, lastOrders, weeklySpending] = await Promise.all([
+    const now = new Date();
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+
+    const [totalSpent, statusCounts, lastOrders, weeklySpending, ordersThisMonth, pendingDeliveries] = await Promise.all([
       prisma.order.aggregate({
         where: { userId: (user as any).id, status: 'DELIVERED' },
         _sum: { totalAmount: true }
@@ -221,7 +295,16 @@ const getMyStats = async (req: Request, res: Response, next: NextFunction) => {
           createdAt: { gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) }
         },
         _sum: { totalAmount: true }
-      })
+      }),
+      prisma.order.count({
+        where: { userId: (user as any).id, createdAt: { gte: startOfMonth } },
+      }),
+      prisma.order.count({
+        where: {
+          userId: (user as any).id,
+          status: { in: ['PLACED', 'PREPARING', 'READY'] },
+        },
+      }),
     ]);
 
     // Format weekly spending into days
@@ -241,10 +324,13 @@ const getMyStats = async (req: Request, res: Response, next: NextFunction) => {
       message: 'Stats retrieved successfully',
       data: {
         totalSpent: total,
+        ordersThisMonth,
+        pendingDeliveries,
         statusCounts,
         lastOrders,
         spendingTrend,
-        rewardPoints: Math.floor(total * 0.1) // 1 point per $10 spent as reward
+        rewardPoints: Math.floor(total * 0.1), // 1 point per $10 spent as reward
+        savedMeals: 0,
       }
     });
   } catch (error) {

@@ -94,7 +94,7 @@ const getMealReviews = async (req: Request, res: Response, next: NextFunction) =
 // Get Top Reviews as Testimonials (Public)
 const getPublicTestimonials = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    let reviews = await prisma.review.findMany({
+    const reviews = await prisma.review.findMany({
       where: { rating: 5 },
       take: 6,
       orderBy: { createdAt: 'desc' },
@@ -103,31 +103,6 @@ const getPublicTestimonials = async (req: Request, res: Response, next: NextFunc
         meal: { select: { title: true } }
       }
     });
-
-    // Auto-seed if empty
-    if (reviews.length === 0) {
-       const users = await prisma.user.findMany({ take: 3 });
-       const meals = await prisma.meal.findMany({ take: 3 });
-       
-       if (users.length > 0 && meals.length > 0) {
-          await prisma.review.createMany({
-             data: [
-                { userId: users[0].id, mealId: meals[0].id, rating: 5, comment: "Absolutely divine! The flavors were perfectly balanced." },
-                { userId: users[1 % users.length].id, mealId: meals[1 % meals.length].id, rating: 5, comment: "Best platform for authentic home-cooked meals." },
-                { userId: users[2 % users.length].id, mealId: meals[2 % meals.length].id, rating: 5, comment: "Fast delivery and the chef was really professional." }
-             ]
-          });
-          
-          reviews = await prisma.review.findMany({
-             where: { rating: 5 },
-             take: 3,
-             include: {
-               user: { select: { name: true } },
-               meal: { select: { title: true } }
-             }
-          });
-       }
-    }
 
     res.status(200).json({
       success: true,

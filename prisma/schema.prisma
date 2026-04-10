@@ -32,6 +32,8 @@ enum Role {
   CUSTOMER
   PROVIDER
   ADMIN
+  MANAGER
+  ORGANIZER
 }
 
 model ProviderProfile {
@@ -147,8 +149,57 @@ model Offer {
   image       String
   tag         String
   color       String
+  code        String?  @unique
+  discountType DiscountType @default(PERCENTAGE)
+  discountValue Float @default(0)
+  minOrderAmount Int @default(0)
+  maxDiscountAmount Int?
+  startsAt    DateTime?
+  expiresAt   DateTime?
+  usageLimit  Int?
+  usedCount   Int      @default(0)
   isActive    Boolean  @default(true)
   createdAt   DateTime @default(now())
+  updatedAt   DateTime @default(now()) @updatedAt
 
   @@map("offers")
+}
+
+enum DiscountType {
+  PERCENTAGE
+  FIXED
+}
+
+model BlogPost {
+  id          String   @id @default(uuid())
+  title       String
+  excerpt     String
+  content     String
+  image       String
+  author      String
+  category    String
+  isPublished Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("blog_posts")
+}
+
+model HomeContent {
+  id        String   @id @default(uuid())
+  key       String   @unique
+  content   Json
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("home_contents")
+}
+
+model NewsletterSubscriber {
+  id        BigInt   @id @default(autoincrement())
+  email     String   @unique
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("newsletter_subscribers")
 }

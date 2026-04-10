@@ -94,11 +94,108 @@ const deleteReview = async (req: Request, res: Response, next: NextFunction) => 
   }
 };
 
+const getAllOffers = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const result = await AdminService.getAllOffers();
+    res.status(200).json({
+      success: true,
+      statusCode: 200,
+      message: 'Offers retrieved successfully',
+      data: result,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+const createOffer = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const result = await AdminService.createOffer(req.body);
+    res.status(201).json({
+      success: true,
+      statusCode: 201,
+      message: 'Offer created successfully',
+      data: result,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+const updateOffer = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { id } = req.params;
+    const result = await AdminService.updateOffer(id as string, req.body);
+    res.status(200).json({
+      success: true,
+      statusCode: 200,
+      message: 'Offer updated successfully',
+      data: result,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+const deleteOffer = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { id } = req.params;
+    await AdminService.deleteOffer(id as string);
+    res.status(200).json({
+      success: true,
+      statusCode: 200,
+      message: 'Offer deleted successfully',
+      data: null,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+const getHomeContent = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const result = await AdminService.getHomeContent();
+    res.status(200).json({
+      success: true,
+      statusCode: 200,
+      message: 'Home content retrieved successfully',
+      data: result,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+const upsertHomeContent = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { content, isActive } = req.body ?? {};
+    if (!content || typeof content !== 'object') {
+      throw { statusCode: 400, message: 'content object is required' };
+    }
+
+    const result = await AdminService.upsertHomeContent(content, isActive ?? true);
+    res.status(200).json({
+      success: true,
+      statusCode: 200,
+      message: 'Home content saved successfully',
+      data: result,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 export const AdminController = {
   getAllUsers,
   updateUserStatus,
   getAllOrders,
   getDashboardStats,
   getAllReviews,
-  deleteReview
+  deleteReview,
+  getAllOffers,
+  createOffer,
+  updateOffer,
+  deleteOffer,
+  getHomeContent,
+  upsertHomeContent,
 };
