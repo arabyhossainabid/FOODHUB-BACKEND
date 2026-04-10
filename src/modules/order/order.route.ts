@@ -188,6 +188,71 @@ const cancelOrder = async (req: Request, res: Response, next: NextFunction) => {
   }
 };
 
+// Get My Stats (Customer Dashboard)
+const getMyStats = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const user = req.user;
+    if (!user) {
+      throw { statusCode: 401, message: 'User not authenticated' };
+    }
+
+    const [totalSpent, statusCounts, lastOrders, weeklySpending] = await Promise.all([
+      prisma.order.aggregate({
+        where: { userId: (user as any).id, status: 'DELIVERED' },
+        _sum: { totalAmount: true }
+      }),
+      prisma.order.groupBy({
+        by: ['status'],
+        where: { userId: (user as any).id },
+        _count: true
+      }),
+      prisma.order.findMany({
+        where: { userId: (user as any).id },
+        take: 5,
+        orderBy: { createdAt: 'desc' },
+        include: { orderItems: { include: { meal: true } } }
+      }),
+      // Weekly trend
+      prisma.order.groupBy({
+        by: ['createdAt'],
+        where: { 
+          userId: (user as any).id, 
+          status: 'DELIVERED',
+          createdAt: { gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) }
+        },
+        _sum: { totalAmount: true }
+      })
+    ]);
+
+    // Format weekly spending into days
+    const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    const spendingTrend = days.map(day => {
+       const amount = weeklySpending
+         .filter(ws => days[new Date(ws.createdAt).getDay()] === day)
+         .reduce((acc, current) => acc + (current._sum.totalAmount || 0), 0);
+       return { day, amount };
+    });
+
+    const total = totalSpent._sum.totalAmount || 0;
+
+    res.status(200).json({
+      success: true,
+      statusCode: 200,
+      message: 'Stats retrieved successfully',
+      data: {
+        totalSpent: total,
+        statusCounts,
+        lastOrders,
+        spendingTrend,
+        rewardPoints: Math.floor(total * 0.1) // 1 point per $10 spent as reward
+      }
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+router.get('/stats', auth(Role.CUSTOMER), getMyStats);
 router.post('/', auth(Role.CUSTOMER), createOrder);
 router.get('/', auth(Role.CUSTOMER), getMyOrders);
 router.get('/:id', auth(Role.CUSTOMER), getOrderById);

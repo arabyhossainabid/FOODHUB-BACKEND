@@ -69,9 +69,27 @@ const googleAuthCallback = async (req: Request, res: Response, next: NextFunctio
   }
 };
 
+const updateProfile = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const user = req.user;
+    if (!user) throw { statusCode: 401, message: 'User not authenticated' };
+
+    const result = await AuthService.updateProfile((user as any).id, req.body);
+    res.status(200).json({
+      success: true,
+      statusCode: 200,
+      message: 'Profile updated successfully',
+      data: result
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 export const AuthController = {
   register,
   login,
   getMe,
-  googleAuthCallback
+  googleAuthCallback,
+  updateProfile
 };

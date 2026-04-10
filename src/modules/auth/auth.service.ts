@@ -93,8 +93,25 @@ const googleAuthCallback = async (user: User) => {
   };
 };
 
+const updateProfile = async (id: string, data: { name?: string; email?: string }) => {
+  const user = await prisma.user.update({
+    where: { id },
+    data: {
+      ...(data.name && { name: data.name }),
+      ...(data.email && { email: data.email }),
+    },
+    include: {
+      providerProfile: true
+    }
+  });
+
+  const { password, ...userWithoutPassword } = user as any;
+  return userWithoutPassword;
+};
+
 export const AuthService = {
   register,
   login,
-  googleAuthCallback
+  googleAuthCallback,
+  updateProfile
 };

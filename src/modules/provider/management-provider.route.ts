@@ -287,6 +287,72 @@ const updateProviderProfile = async (req: Request, res: Response, next: NextFunc
   }
 };
 
+// Get Provider Dashboard Stats
+const getProviderStats = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const user = req.user;
+    if (!user) throw { statusCode: 401, message: 'User not authenticated' };
+
+    const providerProfile = await prisma.providerProfile.findUnique({
+      where: { userId: (user as any).id }
+    });
+
+    if (!providerProfile) throw { statusCode: 400, message: 'Provider profile not found' };
+
+    const [mealsCount, orders, reviews] = await Promise.all([
+      prisma.meal.count({ where: { providerId: providerProfile.id } }),
+      prisma.order.findMany({
+        where: { orderItems: { some: { meal: { providerId: providerProfile.id } } } }
+      }),
+      prisma.review.findMany({
+        where: { meal: { providerId: providerProfile.id } }
+      })
+    ]);
+
+    const totalOrders = orders.length;
+    const totalEarnings = orders.reduce((acc, o) => o.status === 'DELIVERED' ? acc + Number(o.totalAmount) : acc, 0);
+    const avgRating = reviews.length > 0 ? reviews.reduce((acc, r) => acc + r.rating, 0) / reviews.length : 0;
+
+    // Calculate real 7-day trend
+    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+    const weeklyData = await prisma.order.groupBy({
+       by: ['createdAt'],
+       where: {
+         status: 'DELIVERED',
+         orderItems: { some: { meal: { providerId: providerProfile.id } } },
+         createdAt: { gte: sevenDaysAgo }
+       },
+       _sum: { totalAmount: true }
+    });
+
+    const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    const earningsTrend = days.map(day => {
+       const amount = weeklyData
+         .filter(wd => days[new Date(wd.createdAt).getDay()] === day)
+         .reduce((acc, curr) => acc + (curr._sum.totalAmount || 0), 0);
+       return { day, amount };
+    });
+
+    res.status(200).json({
+      success: true,
+      statusCode: 200,
+      message: 'Provider stats retrieved successfully',
+      data: {
+        totalMeals: mealsCount,
+        totalOrders,
+        totalEarnings,
+        avgRating: Number(avgRating.toFixed(1)),
+        totalReviews: reviews.length,
+        earningsTrend
+      }
+    });
+
+  } catch (error) {
+    next(error);
+  }
+};
+
+router.get('/stats', auth(Role.PROVIDER), getProviderStats);
 router.get('/profile', auth(Role.PROVIDER), getProviderProfile);
 router.patch('/profile', auth(Role.PROVIDER), updateProviderProfile);
 router.get('/meals', auth(Role.PROVIDER), getProviderMeals);

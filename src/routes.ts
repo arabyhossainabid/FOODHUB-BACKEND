@@ -7,45 +7,11 @@ import { OrderRoutes } from './modules/order/order.route';
 import { AdminRoutes } from './modules/admin/admin.route';
 import { CategoryRoutes } from './modules/admin/category.route';
 import { ReviewRoutes } from './modules/review/review.route';
+import { MetaRoutes } from './modules/meta/meta.route';
 
 const router = express.Router();
 
-const moduleRoutes = [
-
-  {
-    path: '/auth',
-    route: AuthRoutes,
-  },
-  {
-    path: '/provider', // Management routes
-    route: ManagementProviderRoutes,
-  },
-  {
-    path: '/meals', // Public routes
-    route: MealRoutes,
-  },
-  {
-    path: '/providers', // Public routes
-    route: PublicProviderRoutes,
-  },
-  {
-    path: '/orders', // Customer routes
-    route: OrderRoutes,
-  },
-  {
-    path: '/admin', // Admin routes
-    route: AdminRoutes,
-  },
-  {
-    path: '/admin/categories',
-    route: CategoryRoutes,
-  },
-  {
-    path: '/reviews',
-    route: ReviewRoutes,
-  },
-];
-
+// Health Check
 router.get('/health', (req, res) => {
   res.status(200).json({
     success: true,
@@ -58,6 +24,15 @@ router.get('/health', (req, res) => {
   });
 });
 
-moduleRoutes.forEach((route) => router.use(route.path, route.route));
+// Explicit Route Registration for better reliability
+router.use('/meta', MetaRoutes);
+router.use('/reviews', ReviewRoutes);
+router.use('/auth', AuthRoutes);
+router.use('/meals', MealRoutes);
+router.use('/providers', PublicProviderRoutes);
+router.use('/orders', OrderRoutes);
+router.use('/admin', AdminRoutes);
+router.use('/admin/categories', CategoryRoutes);
+router.use('/provider', ManagementProviderRoutes);
 
 export default router;

@@ -8,6 +8,7 @@ const router = express.Router();
 router.post('/register', AuthController.register);
 router.post('/login', AuthController.login);
 router.get('/me', auth(), AuthController.getMe);
+router.patch('/update-profile', auth(), AuthController.updateProfile);
 
 // Google OAuth routes
 router.get(

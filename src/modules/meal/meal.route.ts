@@ -7,7 +7,10 @@ const router = express.Router();
 // Get all meals (Public) with filters
 const getAllMeals = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { categoryId, minPrice, maxPrice, providerId, search } = req.query;
+    const { categoryId, minPrice, maxPrice, providerId, search, page = '1', limit = '10', sortBy = 'createdAt', order = 'desc' } = req.query;
+
+    const skip = (Number(page) - 1) * Number(limit);
+    const take = Number(limit);
 
     const where: any = { isAvailable: true };
 
@@ -25,18 +28,24 @@ const getAllMeals = async (req: Request, res: Response, next: NextFunction) => {
       ];
     }
 
-    const meals = await prisma.meal.findMany({
-      where,
-      include: {
-        provider: {
-          include: { user: { select: { name: true } } }
-        },
-        category: true,
-        reviews: {
-          select: { rating: true }
+    const [total, meals] = await Promise.all([
+      prisma.meal.count({ where }),
+      prisma.meal.findMany({
+        where,
+        skip,
+        take,
+        orderBy: { [sortBy as string]: order },
+        include: {
+          provider: {
+            include: { user: { select: { name: true } } }
+          },
+          category: true,
+          reviews: {
+            select: { rating: true }
+          }
         }
-      }
-    });
+      })
+    ]);
 
     // Calculate average rating for each meal
     const mealsWithRating = meals.map(meal => ({
@@ -50,6 +59,12 @@ const getAllMeals = async (req: Request, res: Response, next: NextFunction) => {
       success: true,
       statusCode: 200,
       message: 'Meals retrieved successfully',
+      meta: {
+        total,
+        page: Number(page),
+        limit: Number(limit),
+        totalPages: Math.ceil(total / Number(limit))
+      },
       data: mealsWithRating
     });
   } catch (error) {

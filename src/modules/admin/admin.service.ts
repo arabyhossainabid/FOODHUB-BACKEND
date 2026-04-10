@@ -36,7 +36,7 @@ const getAllOrders = async () => {
 };
 
 const getDashboardStats = async () => {
-  const [totalUsers, totalProviders, totalOrders, totalMeals, revenueResult] = await Promise.all([
+  const [totalUsers, totalProviders, totalOrders, totalMeals, revenueResult, roleDistribution] = await Promise.all([
     prisma.user.count({ where: { role: Role.CUSTOMER } }),
     prisma.user.count({ where: { role: Role.PROVIDER } }),
     prisma.order.count(),
@@ -44,15 +44,46 @@ const getDashboardStats = async () => {
     prisma.order.aggregate({
       where: { status: 'DELIVERED' },
       _sum: { totalAmount: true }
+    }),
+    prisma.user.groupBy({
+      by: ['role'],
+      _count: true
     })
   ]);
+
+  // Real monthly revenue for last 6 months
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const now = new Date();
+  const sixMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 5, 1);
+
+  const realRevenue = await prisma.order.groupBy({
+    by: ['createdAt'],
+    where: {
+      status: 'DELIVERED',
+      createdAt: { gte: sixMonthsAgo }
+    },
+    _sum: { totalAmount: true }
+  });
+
+  const monthlyRevenue = [];
+  for (let i = 5; i >= 0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    const monthName = months[d.getMonth()];
+    const amount = realRevenue
+      .filter(r => new Date(r.createdAt).getMonth() === d.getMonth() && new Date(r.createdAt).getFullYear() === d.getFullYear())
+      .reduce((acc, curr) => acc + (curr._sum.totalAmount || 0), 0);
+    
+    monthlyRevenue.push({ month: monthName, amount });
+  }
 
   return {
     totalUsers,
     totalProviders,
     totalOrders,
     totalMeals,
-    totalRevenue: revenueResult._sum.totalAmount || 0
+    totalRevenue: revenueResult._sum.totalAmount || 0,
+    roleDistribution,
+    monthlyRevenue
   };
 };
 

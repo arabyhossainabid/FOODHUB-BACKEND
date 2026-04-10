@@ -129,3 +129,16 @@ model Review {
 
   @@map("reviews")
 }
+
+model Offer {
+  id          String   @id @default(uuid())
+  title       String
+  description String
+  image       String
+  tag         String
+  color       String
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+
+  @@map("offers")
+}
