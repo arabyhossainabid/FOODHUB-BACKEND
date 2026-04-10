@@ -8,6 +8,8 @@ import { AdminRoutes } from './modules/admin/admin.route';
 import { CategoryRoutes } from './modules/admin/category.route';
 import { ReviewRoutes } from './modules/review/review.route';
 import { MetaRoutes } from './modules/meta/meta.route';
+import { PaymentRoutes } from './modules/payment/payment.route';
+import { UploadRoutes } from './modules/upload/upload.route';
 
 const router = express.Router();
 
@@ -31,6 +33,8 @@ router.use('/auth', AuthRoutes);
 router.use('/meals', MealRoutes);
 router.use('/providers', PublicProviderRoutes);
 router.use('/orders', OrderRoutes);
+router.use('/payments', PaymentRoutes);
+router.use('/uploads', UploadRoutes);
 router.use('/admin', AdminRoutes);
 router.use('/admin/categories', CategoryRoutes);
 router.use('/provider', ManagementProviderRoutes);
