@@ -6,7 +6,17 @@ const getAllUsers = async () => {
     where: {
       role: { not: Role.ADMIN }
     },
-    include: { providerProfile: true },
+    select: {
+      id: true,
+      name: true,
+      email: true,
+      role: true,
+      isActive: true,
+      createdAt: true,
+      updatedAt: true,
+      googleId: true,
+      providerProfile: true,
+    },
     orderBy: { createdAt: 'desc' }
   });
   return users;
@@ -18,6 +28,62 @@ const updateUserStatus = async (id: string, isActive: boolean) => {
     data: { isActive }
   });
   return user;
+};
+
+/**
+ * Permanently removes the user row and dependent data from the database.
+ * Provider accounts: removes order lines that reference their meals, drops empty orders,
+ * then reviews & meals, then the user (and provider profile via cascade).
+ */
+const deleteUser = async (targetUserId: string, actingAdminId: string) => {
+  if (targetUserId === actingAdminId) {
+    throw { statusCode: 400, message: 'You cannot delete your own account' };
+  }
+
+  await prisma.$transaction(async (tx) => {
+    const target = await tx.user.findUnique({
+      where: { id: targetUserId },
+      include: { providerProfile: true },
+    });
+
+    if (!target) {
+      throw { statusCode: 404, message: 'User not found' };
+    }
+
+    if (target.role === Role.ADMIN) {
+      throw { statusCode: 403, message: 'Admin accounts cannot be deleted' };
+    }
+
+    if (target.providerProfile) {
+      const meals = await tx.meal.findMany({
+        where: { providerId: target.providerProfile.id },
+        select: { id: true },
+      });
+      const mealIds = meals.map((m) => m.id);
+
+      if (mealIds.length > 0) {
+        const affectedItems = await tx.orderItem.findMany({
+          where: { mealId: { in: mealIds } },
+          select: { orderId: true },
+        });
+        const affectedOrderIds = [...new Set(affectedItems.map((i) => i.orderId))];
+
+        await tx.orderItem.deleteMany({ where: { mealId: { in: mealIds } } });
+
+        for (const orderId of affectedOrderIds) {
+          const remaining = await tx.orderItem.count({ where: { orderId } });
+          if (remaining === 0) {
+            await tx.order.delete({ where: { id: orderId } });
+          }
+        }
+
+        await tx.review.deleteMany({ where: { mealId: { in: mealIds } } });
+        await tx.meal.deleteMany({ where: { id: { in: mealIds } } });
+      }
+    }
+
+    await tx.user.delete({ where: { id: targetUserId } });
+  });
 };
 
 const getAllOrders = async () => {
@@ -220,6 +286,7 @@ const upsertHomeContent = async (content: unknown, isActive = true) => {
 export const AdminService = {
   getAllUsers,
   updateUserStatus,
+  deleteUser,
   getAllOrders,
   getDashboardStats,
   getAllReviews,

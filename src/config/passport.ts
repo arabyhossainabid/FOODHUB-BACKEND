@@ -1,8 +1,23 @@
 import passport from 'passport';
+import { Request } from 'express';
 import { Strategy as JwtStrategy, ExtractJwt } from 'passport-jwt';
 import { Strategy as GoogleStrategy } from 'passport-google-oauth20';
+import { Role } from '@prisma/client';
 import prisma from './prisma';
 import config from './env';
+
+const OAUTH_SIGNUP_ROLES: Role[] = [
+  Role.CUSTOMER,
+  Role.PROVIDER,
+  Role.MANAGER,
+  Role.ORGANIZER,
+];
+
+function roleFromGoogleOAuthState(req: Request): Role {
+  const raw = typeof req.query.state === 'string' ? req.query.state : undefined;
+  if (raw && OAUTH_SIGNUP_ROLES.includes(raw as Role)) return raw as Role;
+  return Role.CUSTOMER;
+}
 
 const opts = {
   jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
@@ -34,8 +49,9 @@ passport.use(
       clientID: config.google_client_id as string,
       clientSecret: config.google_client_secret as string,
       callbackURL: config.google_callback_url as string,
+      passReqToCallback: true,
     },
-    async (accessToken, refreshToken, profile, done) => {
+    async (req: Request, accessToken, refreshToken, profile, done) => {
       try {
         // Check if user already exists in our db
         let user = await prisma.user.findUnique({
@@ -64,6 +80,12 @@ passport.use(
           return done(null, user);
         }
 
+        let newRole = roleFromGoogleOAuthState(req);
+        // Provider accounts need a profile; OAuth has no shop details — keep as customer
+        if (newRole === Role.PROVIDER) {
+          newRole = Role.CUSTOMER;
+        }
+
         // Create new user
         user = await prisma.user.create({
           data: {
@@ -71,7 +93,7 @@ passport.use(
             email: profile.emails?.[0]?.value || '',
             password: '', // No password for OAuth users
             googleId: profile.id,
-            role: 'CUSTOMER',
+            role: newRole,
           },
           include: { providerProfile: true }
         });

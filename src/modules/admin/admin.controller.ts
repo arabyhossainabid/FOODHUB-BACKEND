@@ -37,6 +37,27 @@ const updateUserStatus = async (req: Request, res: Response, next: NextFunction)
   }
 };
 
+const deleteUser = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { id } = req.params;
+    const admin = req.user;
+    if (!admin) {
+      throw { statusCode: 401, message: 'Unauthorized' };
+    }
+
+    await AdminService.deleteUser(id as string, (admin as { id: string }).id);
+
+    res.status(200).json({
+      success: true,
+      statusCode: 200,
+      message: 'User account deleted successfully',
+      data: null,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 const getAllOrders = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const result = await AdminService.getAllOrders();
@@ -188,6 +209,7 @@ const upsertHomeContent = async (req: Request, res: Response, next: NextFunction
 export const AdminController = {
   getAllUsers,
   updateUserStatus,
+  deleteUser,
   getAllOrders,
   getDashboardStats,
   getAllReviews,

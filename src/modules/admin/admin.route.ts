@@ -5,18 +5,19 @@ import { AdminController } from './admin.controller';
 
 const router = express.Router();
 
-// User Management
-router.get('/users', auth(Role.ADMIN), AdminController.getAllUsers);
+// User Management (managers: read-only list; status changes remain admin-only)
+router.get('/users', auth(Role.ADMIN, Role.MANAGER), AdminController.getAllUsers);
 router.patch('/users/:id', auth(Role.ADMIN), AdminController.updateUserStatus);
+router.delete('/users/:id', auth(Role.ADMIN), AdminController.deleteUser);
 
 // Order Oversight
-router.get('/orders', auth(Role.ADMIN), AdminController.getAllOrders);
+router.get('/orders', auth(Role.ADMIN, Role.MANAGER), AdminController.getAllOrders);
 
 // Dashboard Statistics
 router.get('/stats', auth(Role.ADMIN), AdminController.getDashboardStats);
 
-// Review Management
-router.get('/reviews', auth(Role.ADMIN), AdminController.getAllReviews);
+// Review Management (managers: read-only oversight)
+router.get('/reviews', auth(Role.ADMIN, Role.MANAGER), AdminController.getAllReviews);
 router.delete('/reviews/:id', auth(Role.ADMIN), AdminController.deleteReview);
 
 // Offer Management
